@@ -3,8 +3,18 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./@types" // Ensure this points to your custom types
+    ],
+    "noImplicitAny": true,
+    "strict": true
   },
+  "include": [
+    "src/**/*",
+    "@types/**/*"  // Include your custom types
+  ],
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },
