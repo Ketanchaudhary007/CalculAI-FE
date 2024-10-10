@@ -206,7 +206,7 @@ export default function Home() {
             <div className='grid grid-cols-3 gap-2'>
                 <Button
                     onClick={() => setReset(true)}
-                    className='z-20 bg-black text-white'
+                    className='z-20 bg-black text-white text-lg'
                     variant='default'
                     color='black'
                 >
@@ -219,11 +219,11 @@ export default function Home() {
                 </Group>
                 <Button
                     onClick={runRoute}
-                    className='z-20 bg-black text-white'
+                    className='z-20 bg-orange-500 text-white text-lg'
                     variant='default'
                     color='white'
                 >
-                    Run
+                    Calculate
                 </Button>
             </div>
             <canvas
