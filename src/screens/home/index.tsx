@@ -151,7 +151,7 @@ export default function Home() {
         const canvas = canvasRef.current;
         if (canvas) {
             // Ensure VITE_API_URL is correct and points to your backend
-            const apiUrl = import.meta.env.VITE_API_URL; // e.g., 'http://localhost:8000'
+           // const apiUrl = import.meta.env.VITE_API_URL; // e.g., 'http://localhost:8000'
         
             try {
                 const response = await axios.post('https://calculai.onrender.com/calculate', {
