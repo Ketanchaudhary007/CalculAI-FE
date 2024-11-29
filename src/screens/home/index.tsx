@@ -150,36 +150,38 @@ export default function Home() {
     const runRoute = async () => {
         const canvas = canvasRef.current;
         if (canvas) {
-            // Ensure VITE_API_URL is correct and points to your backend
-           // const apiUrl = import.meta.env.VITE_API_URL; // e.g., 'http://localhost:8000'
-        
             try {
-                const response = await axios.post('https://calculai.onrender.com/calculate', {
-                    image: canvas.toDataURL('image/png'),
-                    dict_of_vars: dictOfVars,
+                // Sending the canvas data and dict_of_vars to the backend
+                const response = await axios({
+                    method: 'post',
+                    url: `${import.meta.env.VITE_API_URL}/calculate`,
+                    data: {
+                        image: canvas.toDataURL('image/png'),
+                        dict_of_vars: dictOfVars
+                    }
                 });
+    
+                // Check if the response is structured correctly
+                const resp = response.data;
+                console.log('Response', resp);  // Log the entire response for debugging
                 
-        
-                // Log the full response to check its structure
-                console.log('Response:', response);
-        
-                const resp = response.data;  // No need for await here
-                if (resp && resp.data) {
-                    // Assuming the response contains a `data` key
+                // Ensure the response contains data and iterate safely
+                if (resp && resp.data && Array.isArray(resp.data)) {
                     resp.data.forEach((data: Response) => {
                         if (data.assign === true) {
-                            setDictOfVars({
-                                ...dictOfVars,
-                                [data.expr]: data.result,
-                            });
+                            setDictOfVars(prevState => ({
+                                ...prevState,
+                                [data.expr]: data.result
+                            }));
                         }
                     });
-        
-                    // Process the canvas for new position (if necessary)
+    
+                    // Get canvas context for later image processing
                     const ctx = canvas.getContext('2d');
                     const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
                     let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-        
+    
+                    // Loop through image data to determine the bounds for rendering
                     for (let y = 0; y < canvas.height; y++) {
                         for (let x = 0; x < canvas.width; x++) {
                             const i = (y * canvas.width + x) * 4;
@@ -191,25 +193,27 @@ export default function Home() {
                             }
                         }
                     }
-        
+    
+                    // Center the latex position
                     const centerX = (minX + maxX) / 2;
                     const centerY = (minY + maxY) / 2;
-        
+    
                     setLatexPosition({ x: centerX, y: centerY });
-        
+    
+                    // Set the result to show the latex expression
                     resp.data.forEach((data: Response) => {
                         setTimeout(() => {
                             setResult({
                                 expression: data.expr,
-                                answer: data.result,
+                                answer: data.result
                             });
                         }, 1000);
                     });
                 } else {
-                    console.error('Unexpected response format:', resp);
+                    console.error('Invalid response format:', resp);
                 }
             } catch (error) {
-                console.error('Error during API call', error);
+                console.error('Error during API call:', error);
             }
         }
     };
