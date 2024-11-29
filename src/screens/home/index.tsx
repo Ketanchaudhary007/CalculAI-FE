@@ -154,14 +154,11 @@ export default function Home() {
             const apiUrl = import.meta.env.VITE_API_URL; // e.g., 'http://localhost:8000'
         
             try {
-                const response = await axios({
-                    method: 'post',
-                    url: `${apiUrl}/calculate`,  // Ensure this matches your backend route
-                    data: {
-                        image: canvas.toDataURL('image/png'),
-                        dict_of_vars: dictOfVars,
-                    },
+                const response = await axios.post('https://calculai.onrender.com/calculate', {
+                    image: canvas.toDataURL('image/png'),
+                    dict_of_vars: dictOfVars,
                 });
+                
         
                 // Log the full response to check its structure
                 console.log('Response:', response);
