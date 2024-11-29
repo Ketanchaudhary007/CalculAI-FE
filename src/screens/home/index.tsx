@@ -152,7 +152,7 @@ export default function Home() {
         if (canvas) {
             // Ensure VITE_API_URL is correct and points to your backend
             const apiUrl = import.meta.env.VITE_API_URL; // e.g., 'http://localhost:8000'
-    
+        
             try {
                 const response = await axios({
                     method: 'post',
@@ -162,48 +162,57 @@ export default function Home() {
                         dict_of_vars: dictOfVars,
                     },
                 });
-    
-                const resp = await response.data;
-                console.log('Response', resp);
-                resp.data.forEach((data: Response) => {
-                    if (data.assign === true) {
-                        setDictOfVars({
-                            ...dictOfVars,
-                            [data.expr]: data.result,
-                        });
-                    }
-                });
-    
-                const ctx = canvas.getContext('2d');
-                const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-                let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-    
-                for (let y = 0; y < canvas.height; y++) {
-                    for (let x = 0; x < canvas.width; x++) {
-                        const i = (y * canvas.width + x) * 4;
-                        if (imageData.data[i + 3] > 0) {
-                            minX = Math.min(minX, x);
-                            minY = Math.min(minY, y);
-                            maxX = Math.max(maxX, x);
-                            maxY = Math.max(maxY, y);
+        
+                // Log the full response to check its structure
+                console.log('Response:', response);
+        
+                const resp = response.data;  // No need for await here
+                if (resp && resp.data) {
+                    // Assuming the response contains a `data` key
+                    resp.data.forEach((data: Response) => {
+                        if (data.assign === true) {
+                            setDictOfVars({
+                                ...dictOfVars,
+                                [data.expr]: data.result,
+                            });
+                        }
+                    });
+        
+                    // Process the canvas for new position (if necessary)
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
+                    let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+        
+                    for (let y = 0; y < canvas.height; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const i = (y * canvas.width + x) * 4;
+                            if (imageData.data[i + 3] > 0) {
+                                minX = Math.min(minX, x);
+                                minY = Math.min(minY, y);
+                                maxX = Math.max(maxX, x);
+                                maxY = Math.max(maxY, y);
+                            }
                         }
                     }
+        
+                    const centerX = (minX + maxX) / 2;
+                    const centerY = (minY + maxY) / 2;
+        
+                    setLatexPosition({ x: centerX, y: centerY });
+        
+                    resp.data.forEach((data: Response) => {
+                        setTimeout(() => {
+                            setResult({
+                                expression: data.expr,
+                                answer: data.result,
+                            });
+                        }, 1000);
+                    });
+                } else {
+                    console.error('Unexpected response format:', resp);
                 }
-    
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-    
-                setLatexPosition({ x: centerX, y: centerY });
-                resp.data.forEach((data: Response) => {
-                    setTimeout(() => {
-                        setResult({
-                            expression: data.expr,
-                            answer: data.result,
-                        });
-                    }, 1000);
-                });
             } catch (error) {
-                console.error("Error during API call", error);
+                console.error('Error during API call', error);
             }
         }
     };
