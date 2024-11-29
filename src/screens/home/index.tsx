@@ -201,21 +201,6 @@ export default function Home() {
         }
     };
 
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-            canvas.addEventListener('touchstart', startDrawing, { passive: true });
-            canvas.addEventListener('touchmove', draw, { passive: true });
-            canvas.addEventListener('touchend', stopDrawing, { passive: true });
-
-            return () => {
-                canvas.removeEventListener('touchstart', startDrawing);
-                canvas.removeEventListener('touchmove', draw);
-                canvas.removeEventListener('touchend', stopDrawing);
-            };
-        }
-    }, []);
-
     return (
         <>
             <div className='grid grid-cols-3 gap-2'>
@@ -249,7 +234,9 @@ export default function Home() {
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseOut={stopDrawing}
-                // Touch events are handled in useEffect to ensure passive listeners are added
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
             />
 
             {latexExpression && latexExpression.map((latex, index) => (
