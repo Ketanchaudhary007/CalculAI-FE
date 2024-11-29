@@ -60,6 +60,10 @@ export default function Home() {
                 canvas.height = window.innerHeight - canvas.offsetTop;
                 ctx.lineCap = 'round';
                 ctx.lineWidth = 3;
+
+                // Set the canvas background to gray
+                ctx.fillStyle = '#212326';  // Gray color for background
+                ctx.fillRect(0, 0, canvas.width, canvas.height);  // Fill the canvas with gray
             }
         }
         const script = document.createElement('script');
@@ -93,7 +97,12 @@ export default function Home() {
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
-            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (ctx) {
+                // Reset the canvas and fill with gray background
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'gray';  // Gray color for background
+                ctx.fillRect(0, 0, canvas.width, canvas.height);  // Reapply gray background
+            }
         }
     };
 
@@ -140,7 +149,7 @@ export default function Home() {
     const runRoute = async () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-
+    
         try {
             const response = await axios.post(
                 `${import.meta.env.VITE_API_URL}/calculate`,
@@ -149,17 +158,19 @@ export default function Home() {
                     dict_of_vars: dictOfVars,
                 }
             );
-
+    
             const resp = response.data;
-
+    
             if (resp.status === 'success' && Array.isArray(resp.data)) {
-                resp.data.forEach((item: Response) => {
-                    if (item.assign) {
-                        setDictOfVars((prev) => ({ ...prev, [item.expr]: item.result }));
-                    }
-                });
-
-                if (resp.data.length > 0) {
+                if (resp.data.length === 0) {
+                    console.log('No results found.');
+                } else {
+                    resp.data.forEach((item: Response) => {
+                        if (item.assign) {
+                            setDictOfVars((prev) => ({ ...prev, [item.expr]: item.result }));
+                        }
+                    });
+    
                     const firstResult = resp.data[0];
                     setResult({ expression: firstResult.expr, answer: firstResult.result });
                 }
@@ -170,6 +181,7 @@ export default function Home() {
             console.error('API Error:', error);
         }
     };
+    
 
     return (
         <>
