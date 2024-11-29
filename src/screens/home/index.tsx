@@ -26,36 +26,6 @@ export default function Home() {
     const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
     const [latexExpression, setLatexExpression] = useState<string[]>([]);
 
-    // Render LaTeX on canvas and clear the main canvas
-    const renderLatexToCanvas = (expression: string, answer: string) => {
-        const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
-        setLatexExpression((prev) => [...prev, latex]);
-
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-    };
-
-    // Initialize MathJax
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
-        script.async = true;
-        document.head.appendChild(script);
-
-        script.onload = () => {
-            window.MathJax.Hub.Config({
-                tex2jax: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-            });
-        };
-
-        return () => {
-            document.head.removeChild(script);
-        };
-    }, []);
-
     useEffect(() => {
         if (latexExpression.length > 0 && window.MathJax) {
             setTimeout(() => {
@@ -80,8 +50,38 @@ export default function Home() {
         }
     }, [reset]);
 
-    // Reset canvas
-    const resetCanvas = () => {
+    useEffect(() => {
+        const canvas = canvasRef.current;
+
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight - canvas.offsetTop;
+                ctx.lineCap = 'round';
+                ctx.lineWidth = 3;
+            }
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
+        script.async = true;
+        document.head.appendChild(script);
+
+        script.onload = () => {
+            window.MathJax.Hub.Config({
+                tex2jax: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            });
+        };
+
+        return () => {
+            document.head.removeChild(script);
+        };
+    }, []);
+
+    const renderLatexToCanvas = (expression: string, answer: string) => {
+        const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
+        setLatexExpression((prev) => [...prev, latex]);
+
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -89,37 +89,13 @@ export default function Home() {
         }
     };
 
-    // Drawing logic
-    const startDrawing = (e: any) => {
-        e.preventDefault();
-        const { x, y } = getCanvasCoordinates(e);
+    const resetCanvas = () => {
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                setIsDrawing(true);
-            }
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     };
-
-    const draw = (e: any) => {
-        if (!isDrawing) return;
-        e.preventDefault();
-        const { x, y } = getCanvasCoordinates(e);
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.strokeStyle = color;
-                ctx.lineTo(x, y);
-                ctx.stroke();
-            }
-        }
-    };
-
-    const stopDrawing = () => setIsDrawing(false);
 
     const getCanvasCoordinates = (e: any) => {
         const canvas = canvasRef.current;
@@ -132,44 +108,66 @@ export default function Home() {
         return { x: 0, y: 0 };
     };
 
-    // API Call
-    const runRoute = async () => {
+    const startDrawing = (e: any) => {
         const canvas = canvasRef.current;
         if (canvas) {
-            try {
-                const response = await axios.post(
-                    `${import.meta.env.VITE_API_URL}/calculate`,
-                    {
-                        image: canvas.toDataURL('image/png'),
-                        dict_of_vars: dictOfVars,
-                    }
-                );
-
-                const resp = response.data;
-
-                if (resp.status === 'success' && Array.isArray(resp.data)) {
-                    resp.data.forEach((item: Response) => {
-                        if (item.assign) {
-                            setDictOfVars((prev) => ({
-                                ...prev,
-                                [item.expr]: item.result,
-                            }));
-                        }
-                    });
-
-                    if (resp.data.length > 0) {
-                        const firstResult = resp.data[0];
-                        setResult({
-                            expression: firstResult.expr,
-                            answer: firstResult.result,
-                        });
-                    }
-                } else {
-                    console.error('Unexpected API response format:', resp);
-                }
-            } catch (error) {
-                console.error('API Error:', error);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const { x, y } = getCanvasCoordinates(e);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                setIsDrawing(true);
             }
+        }
+    };
+
+    const draw = (e: any) => {
+        if (!isDrawing) return;
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const { x, y } = getCanvasCoordinates(e);
+                ctx.strokeStyle = color;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
+        }
+    };
+
+    const stopDrawing = () => setIsDrawing(false);
+
+    const runRoute = async () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        try {
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/calculate`,
+                {
+                    image: canvas.toDataURL('image/png'),
+                    dict_of_vars: dictOfVars,
+                }
+            );
+
+            const resp = response.data;
+
+            if (resp.status === 'success' && Array.isArray(resp.data)) {
+                resp.data.forEach((item: Response) => {
+                    if (item.assign) {
+                        setDictOfVars((prev) => ({ ...prev, [item.expr]: item.result }));
+                    }
+                });
+
+                if (resp.data.length > 0) {
+                    const firstResult = resp.data[0];
+                    setResult({ expression: firstResult.expr, answer: firstResult.result });
+                }
+            } else {
+                console.error('Unexpected API response format:', resp);
+            }
+        } catch (error) {
+            console.error('API Error:', error);
         }
     };
 
