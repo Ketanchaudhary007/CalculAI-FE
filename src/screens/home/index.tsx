@@ -26,10 +26,24 @@ export default function Home() {
     const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
     const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
 
+    const renderLatexToCanvas = (expression: string, answer: string) => {
+        const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
+        setLatexExpression([...latexExpression, latex]);
+
+        // Clear the main canvas
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+    };
+
     useEffect(() => {
         if (latexExpression.length > 0 && window.MathJax) {
             setTimeout(() => {
-                window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub]);
+                window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
             }, 0);
         }
     }, [latexExpression]);
@@ -52,7 +66,6 @@ export default function Home() {
 
     useEffect(() => {
         const canvas = canvasRef.current;
-
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
@@ -62,7 +75,6 @@ export default function Home() {
                 ctx.lineWidth = 3;
             }
         }
-
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
         script.async = true;
@@ -79,17 +91,62 @@ export default function Home() {
         };
     }, []);
 
-    const renderLatexToCanvas = (expression: string, answer: string) => {
-        const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
-        setLatexExpression([...latexExpression, latex]);
+    const getCanvasCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            let offsetX = 0;
+            let offsetY = 0;
 
+            if (e instanceof TouchEvent) {
+                // For touch events, get the touch coordinates
+                const touch = e.touches[0]; // Use the first touch point
+                offsetX = touch.clientX;
+                offsetY = touch.clientY;
+            } else if (e instanceof MouseEvent) {
+                // For mouse events, use offsetX and offsetY
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+            }
+
+            return { x: offsetX - rect.left, y: offsetY - rect.top };
+        }
+        return { x: 0, y: 0 };
+    };
+
+    const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+        e.preventDefault();
+        const { x, y } = getCanvasCoordinates(e);
+        const canvas = canvasRef.current;
+        if (canvas) {
+            canvas.style.background = 'rgb(50, 50, 50)';
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                setIsDrawing(true);
+            }
+        }
+    };
+
+    const draw = (e: React.MouseEvent | React.TouchEvent) => {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const { x, y } = getCanvasCoordinates(e);
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = color;
+                ctx.lineTo(x, y);
+                ctx.stroke();
             }
         }
+    };
+
+    const stopDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+        e.preventDefault();
+        setIsDrawing(false);
     };
 
     const resetCanvas = () => {
@@ -102,91 +159,16 @@ export default function Home() {
         }
     };
 
-    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-            canvas.style.background = 'black';
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.beginPath();
-                ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-                setIsDrawing(true);
-            }
-        }
-    };
-
-    const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!isDrawing) {
-            return;
-        }
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.strokeStyle = color;
-                ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-                ctx.stroke();
-            }
-        }
-    };
-
-    const stopDrawing = () => {
-        setIsDrawing(false);
-    };
-
-    // Touch event handlers
-    const startDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                const touch = e.touches[0];
-                const rect = canvas.getBoundingClientRect();
-                const offsetX = touch.clientX - rect.left;
-                const offsetY = touch.clientY - rect.top;
-
-                ctx.beginPath();
-                ctx.moveTo(offsetX, offsetY);
-                setIsDrawing(true);
-            }
-        }
-    };
-
-    const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
-        if (!isDrawing) {
-            return;
-        }
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                const touch = e.touches[0];
-                const rect = canvas.getBoundingClientRect();
-                const offsetX = touch.clientX - rect.left;
-                const offsetY = touch.clientY - rect.top;
-
-                ctx.strokeStyle = color;
-                ctx.lineTo(offsetX, offsetY);
-                ctx.stroke();
-            }
-        }
-    };
-
-    const stopDrawingTouch = () => {
-        setIsDrawing(false);
-    };
-
     const runRoute = async () => {
         const canvas = canvasRef.current;
-
         if (canvas) {
             const response = await axios({
                 method: 'post',
                 url: `${import.meta.env.VITE_API_URL}/calculate`,
                 data: {
                     image: canvas.toDataURL('image/png'),
-                    dict_of_vars: dictOfVars,
-                },
+                    dict_of_vars: dictOfVars
+                }
             });
 
             const resp = await response.data;
@@ -195,7 +177,7 @@ export default function Home() {
                 if (data.assign === true) {
                     setDictOfVars({
                         ...dictOfVars,
-                        [data.expr]: data.result,
+                        [data.expr]: data.result
                     });
                 }
             });
@@ -224,7 +206,7 @@ export default function Home() {
                 setTimeout(() => {
                     setResult({
                         expression: data.expr,
-                        answer: data.result,
+                        answer: data.result
                     });
                 }, 1000);
             });
@@ -233,36 +215,47 @@ export default function Home() {
 
     return (
         <>
-            <div className="grid grid-cols-3 gap-2">
-                <Button onClick={() => setReset(true)} className="z-20 bg-black text-white" variant="default" color="black">
+            <div className='grid grid-cols-3 gap-2'>
+                <Button
+                    onClick={() => setReset(true)}
+                    className='z-20 bg-black text-white text-lg'
+                    variant='default'
+                    color='black'
+                >
                     Reset
                 </Button>
-                <Group className="z-20">
+                <Group className='z-20'>
                     {SWATCHES.map((swatch) => (
                         <ColorSwatch key={swatch} color={swatch} onClick={() => setColor(swatch)} />
                     ))}
                 </Group>
-                <Button onClick={runRoute} className="z-20 bg-black text-white" variant="default" color="white">
-                    Run
+                <Button
+                    onClick={runRoute}
+                    className='z-20 bg-orange-600 text-white text-lg'
+                    variant='default'
+                    color='white'
+                >
+                    Calculate
                 </Button>
             </div>
             <canvas
                 ref={canvasRef}
-                id="canvas"
-                className="absolute top-0 left-0 w-full h-full"
+                id='canvas'
+                className='absolute top-0 left-0 w-full h-full'
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseOut={stopDrawing}
-                onTouchStart={startDrawingTouch}
-                onTouchMove={drawTouch}
-                onTouchEnd={stopDrawingTouch}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
             />
+
             {latexExpression && latexExpression.map((latex, index) => (
                 <Draggable
                     key={index}
                     defaultPosition={latexPosition}
-                    onStop={(_, data) => setLatexPosition({ x: data.x, y: data.y })}
+                    onStop={(_e, data) => setLatexPosition({ x: data.x, y: data.y })}
                 >
                     <div className="absolute p-2 text-white rounded shadow-md">
                         <div className="latex-content">{latex}</div>
