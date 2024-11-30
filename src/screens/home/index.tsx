@@ -21,10 +21,10 @@ export default function Home() {
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('rgb(255, 255, 255)');
     const [reset, setReset] = useState(false);
-    const [dictOfVars, setDictOfVars] = useState<Record<string, string>>({});
+    const [dictOfVars, setDictOfVars] = useState({});
     const [result, setResult] = useState<GeneratedResult>();
     const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
-    const [latexExpression, setLatexExpression] = useState<string[]>([]);
+    const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
 
     useEffect(() => {
         if (latexExpression.length > 0 && window.MathJax) {
@@ -60,12 +60,9 @@ export default function Home() {
                 canvas.height = window.innerHeight - canvas.offsetTop;
                 ctx.lineCap = 'round';
                 ctx.lineWidth = 3;
-
-                // Set the canvas background to gray
-                ctx.fillStyle = '#212326';  // Gray color for background
-                ctx.fillRect(0, 0, canvas.width, canvas.height);  // Fill the canvas with gray
             }
         }
+
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
         script.async = true;
@@ -84,12 +81,14 @@ export default function Home() {
 
     const renderLatexToCanvas = (expression: string, answer: string) => {
         const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
-        setLatexExpression((prev) => [...prev, latex]);
+        setLatexExpression([...latexExpression, latex]);
 
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
-            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
         }
     };
 
@@ -98,98 +97,144 @@ export default function Home() {
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
-                // Reset the canvas and fill with gray background
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'gray';  // Gray color for background
-                ctx.fillRect(0, 0, canvas.width, canvas.height);  // Reapply gray background
             }
         }
     };
 
-    const getCanvasCoordinates = (e: any) => {
+    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (canvas) {
-            const rect = canvas.getBoundingClientRect();
-            const offsetX = e.touches?.[0]?.clientX || e.nativeEvent.offsetX;
-            const offsetY = e.touches?.[0]?.clientY || e.nativeEvent.offsetY;
-            return { x: offsetX - rect.left, y: offsetY - rect.top };
-        }
-        return { x: 0, y: 0 };
-    };
-
-    const startDrawing = (e: any) => {
-        const canvas = canvasRef.current;
-        if (canvas) {
+            canvas.style.background = 'black';
             const ctx = canvas.getContext('2d');
             if (ctx) {
-                const { x, y } = getCanvasCoordinates(e);
                 ctx.beginPath();
-                ctx.moveTo(x, y);
+                ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
                 setIsDrawing(true);
             }
         }
     };
 
-    const draw = (e: any) => {
-        if (!isDrawing) return;
+    const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!isDrawing) {
+            return;
+        }
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
-                const { x, y } = getCanvasCoordinates(e);
                 ctx.strokeStyle = color;
-                ctx.lineTo(x, y);
+                ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
                 ctx.stroke();
             }
         }
     };
 
-    const stopDrawing = () => setIsDrawing(false);
+    const stopDrawing = () => {
+        setIsDrawing(false);
+    };
+
+    // Touch event handlers
+    const startDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const offsetX = touch.clientX - rect.left;
+                const offsetY = touch.clientY - rect.top;
+
+                ctx.beginPath();
+                ctx.moveTo(offsetX, offsetY);
+                setIsDrawing(true);
+            }
+        }
+    };
+
+    const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawing) {
+            return;
+        }
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const offsetX = touch.clientX - rect.left;
+                const offsetY = touch.clientY - rect.top;
+
+                ctx.strokeStyle = color;
+                ctx.lineTo(offsetX, offsetY);
+                ctx.stroke();
+            }
+        }
+    };
+
+    const stopDrawingTouch = () => {
+        setIsDrawing(false);
+    };
 
     const runRoute = async () => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
-    
-        try {
-            const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/calculate`,
-                {
+
+        if (canvas) {
+            const response = await axios({
+                method: 'post',
+                url: `${import.meta.env.VITE_API_URL}/calculate`,
+                data: {
                     image: canvas.toDataURL('image/png'),
                     dict_of_vars: dictOfVars,
-                }
-            );
-    
-            const resp = response.data;
-    
-            if (resp.status === 'success' && Array.isArray(resp.data)) {
-                if (resp.data.length === 0) {
-                    console.log('No results found.');
-                } else {
-                    resp.data.forEach((item: Response) => {
-                        if (item.assign) {
-                            setDictOfVars((prev) => ({ ...prev, [item.expr]: item.result }));
-                        }
+                },
+            });
+
+            const resp = await response.data;
+            console.log('Response', resp);
+            resp.data.forEach((data: Response) => {
+                if (data.assign === true) {
+                    setDictOfVars({
+                        ...dictOfVars,
+                        [data.expr]: data.result,
                     });
-    
-                    const firstResult = resp.data[0];
-                    setResult({ expression: firstResult.expr, answer: firstResult.result });
                 }
-            } else {
-                console.error('Unexpected API response format:', resp);
+            });
+
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
+            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const i = (y * canvas.width + x) * 4;
+                    if (imageData.data[i + 3] > 0) {
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
             }
-        } catch (error) {
-            console.error('API Error:', error);
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            setLatexPosition({ x: centerX, y: centerY });
+            resp.data.forEach((data: Response) => {
+                setTimeout(() => {
+                    setResult({
+                        expression: data.expr,
+                        answer: data.result,
+                    });
+                }, 1000);
+            });
         }
     };
-    
 
     return (
         <>
             <div className="grid grid-cols-3 gap-2">
-                <Button
-                    onClick={() => setReset(true)}
-                    className="z-20 bg-black text-white text-lg"
-                >
+                <Button onClick={() => setReset(true)} className="z-20 bg-black text-white" variant="default" color="black">
                     Reset
                 </Button>
                 <Group className="z-20">
@@ -197,11 +242,8 @@ export default function Home() {
                         <ColorSwatch key={swatch} color={swatch} onClick={() => setColor(swatch)} />
                     ))}
                 </Group>
-                <Button
-                    onClick={runRoute}
-                    className="z-20 bg-orange-500 text-white text-lg"
-                >
-                    Calculate
+                <Button onClick={runRoute} className="z-20 bg-black text-white" variant="default" color="white">
+                    Run
                 </Button>
             </div>
             <canvas
@@ -212,11 +254,11 @@ export default function Home() {
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseOut={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
+                onTouchStart={startDrawingTouch}
+                onTouchMove={drawTouch}
+                onTouchEnd={stopDrawingTouch}
             />
-            {latexExpression.map((latex, index) => (
+            {latexExpression && latexExpression.map((latex, index) => (
                 <Draggable
                     key={index}
                     defaultPosition={latexPosition}
