@@ -3,8 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import Draggable from 'react-draggable';
-import {SWATCHES} from '@/constants';
-// import {LazyBrush} from 'lazy-brush';
+import { SWATCHES } from '@/constants';
 
 interface GeneratedResult {
     expression: string;
@@ -27,11 +26,19 @@ export default function Home() {
     const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
     const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
 
-    // const lazyBrush = new LazyBrush({
-    //     radius: 10,
-    //     enabled: true,
-    //     initialPoint: { x: 0, y: 0 },
-    // });
+    const renderLatexToCanvas = (expression: string, answer: string) => {
+        const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
+        setLatexExpression([...latexExpression, latex]);
+
+        // Clear the main canvas
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+    };
 
     useEffect(() => {
         if (latexExpression.length > 0 && window.MathJax) {
@@ -59,7 +66,6 @@ export default function Home() {
 
     useEffect(() => {
         const canvas = canvasRef.current;
-    
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
@@ -68,7 +74,6 @@ export default function Home() {
                 ctx.lineCap = 'round';
                 ctx.lineWidth = 3;
             }
-
         }
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
@@ -77,30 +82,60 @@ export default function Home() {
 
         script.onload = () => {
             window.MathJax.Hub.Config({
-                tex2jax: {inlineMath: [['$', '$'], ['\\(', '\\)']]},
+                tex2jax: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
             });
         };
 
         return () => {
             document.head.removeChild(script);
         };
-
     }, []);
 
-    const renderLatexToCanvas = (expression: string, answer: string) => {
-        const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
-        setLatexExpression([...latexExpression, latex]);
-
-        // Clear the main canvas
+    const getCanvasCoordinates = (e: any) => {
         const canvas = canvasRef.current;
         if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const offsetX = (e.touches && e.touches[0].clientX) || e.nativeEvent.offsetX;
+            const offsetY = (e.touches && e.touches[0].clientY) || e.nativeEvent.offsetY;
+            return { x: offsetX - rect.left, y: offsetY - rect.top };
+        }
+        return { x: 0, y: 0 };
+    };
+
+    const startDrawing = (e: any) => {
+        e.preventDefault();
+        const { x, y } = getCanvasCoordinates(e);
+        const canvas = canvasRef.current;
+        if (canvas) {
+            canvas.style.background = 'rgb(50, 50, 50)';
             const ctx = canvas.getContext('2d');
             if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                setIsDrawing(true);
             }
         }
     };
 
+    const draw = (e: any) => {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const { x, y } = getCanvasCoordinates(e);
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.strokeStyle = color;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
+        }
+    };
+
+    const stopDrawing = (e: any) => {
+        e.preventDefault();
+        setIsDrawing(false);
+    };
 
     const resetCanvas = () => {
         const canvas = canvasRef.current;
@@ -112,39 +147,8 @@ export default function Home() {
         }
     };
 
-    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-            canvas.style.background = 'black';
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.beginPath();
-                ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-                setIsDrawing(true);
-            }
-        }
-    };
-    const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!isDrawing) {
-            return;
-        }
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.strokeStyle = color;
-                ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-                ctx.stroke();
-            }
-        }
-    };
-    const stopDrawing = () => {
-        setIsDrawing(false);
-    };  
-
     const runRoute = async () => {
         const canvas = canvasRef.current;
-    
         if (canvas) {
             const response = await axios({
                 method: 'post',
@@ -159,13 +163,13 @@ export default function Home() {
             console.log('Response', resp);
             resp.data.forEach((data: Response) => {
                 if (data.assign === true) {
-                    // dict_of_vars[resp.result] = resp.answer;
                     setDictOfVars({
                         ...dictOfVars,
                         [data.expr]: data.result
                     });
                 }
             });
+
             const ctx = canvas.getContext('2d');
             const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
             let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
@@ -173,7 +177,7 @@ export default function Home() {
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
                     const i = (y * canvas.width + x) * 4;
-                    if (imageData.data[i + 3] > 0) {  // If pixel is not transparent
+                    if (imageData.data[i + 3] > 0) {
                         minX = Math.min(minX, x);
                         minY = Math.min(minY, y);
                         maxX = Math.max(maxX, x);
@@ -202,8 +206,8 @@ export default function Home() {
             <div className='grid grid-cols-3 gap-2'>
                 <Button
                     onClick={() => setReset(true)}
-                    className='z-20 bg-black text-white'
-                    variant='default' 
+                    className='z-20 bg-black text-white text-lg'
+                    variant='default'
                     color='black'
                 >
                     Reset
@@ -215,11 +219,11 @@ export default function Home() {
                 </Group>
                 <Button
                     onClick={runRoute}
-                    className='z-20 bg-black text-white'
+                    className='z-20 bg-orange-500 text-white text-lg'
                     variant='default'
                     color='white'
                 >
-                    Run
+                    Calculate
                 </Button>
             </div>
             <canvas
@@ -230,13 +234,16 @@ export default function Home() {
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseOut={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
             />
 
             {latexExpression && latexExpression.map((latex, index) => (
                 <Draggable
                     key={index}
                     defaultPosition={latexPosition}
-                    onStop={(e, data) => setLatexPosition({ x: data.x, y: data.y })}
+                    onStop={(_e, data) => setLatexPosition({ x: data.x, y: data.y })}
                 >
                     <div className="absolute p-2 text-white rounded shadow-md">
                         <div className="latex-content">{latex}</div>
